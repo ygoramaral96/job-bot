@@ -4,8 +4,8 @@
   "maxAgeDays": 21,
   "seenRetentionDays": 90,
   "salaryFloor": {
-    "BRL_month": 12000,
-    "USD_month": 4200
+    "BRL_month": 10000,
+    "USD_month": 4000
   },
   "weights": {
     "seniorTitle": 3,
