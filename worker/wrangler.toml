@@ -1,0 +1,20 @@
+name = "job-bot-telegram"
+main = "index.js"
+compatibility_date = "2026-09-01"
+workers_dev = true
+
+[vars]
+GITHUB_REPO = "<owner>/<repo>"   # the repo that holds this bot and its workflow
+GITHUB_REF = "main"
+WORKFLOW_FILE = "job-bot.yml"
+
+# Full runs, in UTC. Pick the hours you actually read Telegram.
+[triggers]
+crons = ["15 19 * * *", "15 0 * * *", "15 8 * * *"]
+
+[[kv_namespaces]]
+binding = "CLICKS"
+id = "<kv namespace id>"   # npx wrangler kv namespace create CLICKS
+
+[observability]
+enabled = true

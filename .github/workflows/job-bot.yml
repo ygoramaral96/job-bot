@@ -1,0 +1,84 @@
+name: job-bot
+
+on:
+  # No GitHub `schedule`: it fired hours late or not at all. The Cloudflare
+  # Worker in worker/ dispatches mode=full on its Cron Triggers and mode=update
+  # on every Telegram tap.
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'full = fetch and send · clicks = poll Telegram (only without the webhook) · update = one forwarded Telegram update · test = send a test card'
+        type: choice
+        options: [full, clicks, update, test]
+        default: full
+      update:
+        description: 'Telegram update JSON (sent by the webhook Worker)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: job-bot
+  cancel-in-progress: false
+
+env:
+  # Telegram secrets make the run live. The notes repo is optional: with
+  # NOTES_TOKEN and the two variables set, the tracker note is committed there.
+  HAS_TELEGRAM: ${{ secrets.TELEGRAM_BOT_TOKEN != '' && secrets.TELEGRAM_CHAT_ID != '' }}
+  HAS_NOTES: ${{ secrets.NOTES_TOKEN != '' && vars.NOTES_REPO != '' && vars.TRACKER_NOTE_PATH != '' }}
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout job-bot
+        uses: actions/checkout@v7
+
+      - name: Checkout notes repo (tracker note lives there)
+        if: env.HAS_NOTES == 'true'
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ vars.NOTES_REPO }}
+          token: ${{ secrets.NOTES_TOKEN }}
+          path: notes
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Collect, triage, notify
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          JOB_BOT_WORKER_URL: ${{ secrets.JOB_BOT_WORKER_URL }}
+          JOB_BOT_WORKER_KEY: ${{ secrets.JOB_BOT_WORKER_KEY }}
+          TRACKER_NOTE: ${{ env.HAS_NOTES == 'true' && format('{0}/notes/{1}', github.workspace, vars.TRACKER_NOTE_PATH) || '' }}
+          MODE: ${{ github.event.inputs.mode }}
+          # Passed through the environment, never interpolated into the script: it carries user text.
+          JOB_BOT_UPDATE: ${{ github.event.inputs.update }}
+        run: |
+          echo "mode=${MODE:-full}"
+          if [ "$HAS_TELEGRAM" != "true" ]; then node run.js --dry-run --show 15
+          elif [ "$MODE" = "update" ]; then node run.js update
+          elif [ "$MODE" = "test" ]; then node run.js test-card
+          elif [ "$MODE" = "clicks" ]; then node run.js clicks
+          else node run.js; fi
+
+      - name: Commit bot state (this repo)
+        if: env.HAS_TELEGRAM == 'true'
+        run: |
+          git config user.name "job-bot"
+          git config user.email "job-bot@users.noreply.github.com"
+          git add state
+          if git diff --cached --quiet; then echo "state unchanged"; else git commit -m "job-bot: state $(date -u +'%Y-%m-%d %H:%M') UTC" && git push; fi
+
+      - name: Commit tracker note (notes repo)
+        if: env.HAS_NOTES == 'true'
+        working-directory: notes
+        run: |
+          git config user.name "job-bot"
+          git config user.email "job-bot@users.noreply.github.com"
+          git add "${{ vars.TRACKER_NOTE_PATH }}"
+          if git diff --cached --quiet; then echo "note unchanged"; else git commit -m "job-bot: tracker $(date -u +'%Y-%m-%d %H:%M') UTC" && git push; fi

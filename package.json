@@ -1,0 +1,15 @@
+{
+  "name": "job-bot",
+  "version": "1.0.0",
+  "description": "Collects job postings from public APIs, triages them deterministically, and asks for a decision on Telegram. Zero dependencies.",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node run.js",
+    "dry-run": "node run.js --dry-run --show 30",
+    "test": "node --test"
+  }
+}
