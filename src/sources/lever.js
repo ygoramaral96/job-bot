@@ -16,10 +16,24 @@ function remoteOf(workplaceType) {
   return workplaceType === 'remote';
 }
 
-// Lever splits a posting into a plain intro plus titled lists ("Requirements", ...).
+/**
+ * Lever splits a posting into an opening (the company pitch, identical across
+ * a whole board), a body (the role itself), titled lists ("Requirements", …)
+ * and an "additional" closing (benefits, legal notices). Only the body and the
+ * lists describe the job, so the card and the score use those and the
+ * boilerplate is dropped. Older postings expose no separate body; there the
+ * opening is cut off the front of the full description instead.
+ */
 function descriptionOf(job) {
-  const lists = (job.lists || []).map((list) => `${list.text} ${stripHtml(list.content)}`);
-  return [job.descriptionPlain, ...lists].join(' ');
+  const body = job.descriptionBodyPlain || withoutOpening(job.descriptionPlain, job.openingPlain);
+  const lists = (job.lists || []).map((list) => `${list.text}\n${stripHtml(list.content)}`);
+  return [body.trim(), ...lists].filter(Boolean).join('\n\n');
+}
+
+function withoutOpening(description = '', opening = '') {
+  const text = String(description).trim();
+  const intro = String(opening).trim();
+  return intro && text.startsWith(intro) ? text.slice(intro.length) : text;
 }
 
 async function fetchBoard(board) {
@@ -51,4 +65,4 @@ async function fetchLever(boards, log = console.warn) {
   return jobs;
 }
 
-module.exports = { fetchLever };
+module.exports = { fetchLever, descriptionOf };
