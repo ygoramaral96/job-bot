@@ -41,10 +41,20 @@ function sourceSpecificReject(job, location, config) {
     return null;
   }
 
-  if (provider === 'remotive') {
-    // `candidate_required_location` is free text, so only a known-good marker passes.
+  if (provider === 'remotive' || provider === 'workingnomads') {
+    // Free text ("Global", "CET (+/- 3 hours)", "USA only"), so only a known-good marker passes.
     if (!firstTerm(location, config.locationOk)) return `location "${job.location}"`;
     return null;
+  }
+
+  if (provider === 'remoteok') {
+    // Half the postings leave it empty (left to the description check); the
+    // rest are mostly bare city or state names, so a filled-in location needs
+    // an open marker, or a "remote" one with no foreign place next to it.
+    if (!location) return null;
+    if (firstTerm(location, config.locationOpen)) return null;
+    if (firstTerm(location, config.locationOk) && !firstTerm(location, config.foreignCountries)) return null;
+    return `location "${job.location}"`;
   }
 
   // Greenhouse and Lever boards: reject only when the location names a foreign

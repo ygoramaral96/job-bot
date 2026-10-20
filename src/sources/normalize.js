@@ -3,7 +3,8 @@
 //
 //   {
 //     id:              short hash of the URL (stable across runs)
-//     source:          'remotive' | 'himalayas' | 'wwr' | 'greenhouse:<board>' | 'lever:<board>'
+//     source:          'remotive' | 'himalayas' | 'wwr' | 'remoteok' | 'workingnomads' |
+//                      'jobspresso' | 'nodesk' | 'greenhouse:<board>' | 'lever:<board>'
 //     title, company, location: trimmed strings ('' when unknown)
 //     remote:          true | false | null (null = the source does not say)
 //     url:             where to apply

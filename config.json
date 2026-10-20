@@ -42,12 +42,17 @@
       "thoughtworks",
       "gitlab",
       "grafanalabs",
-      "airbnb"
+      "airbnb",
+      "nortal"
     ],
     "lever": [
       "neon",
       "ciandt"
-    ]
+    ],
+    "remoteok": "https://remoteok.com/api",
+    "workingnomads": "https://www.workingnomads.com/api/exposed_jobs/",
+    "jobspresso": "https://jobspresso.co/?feed=job_feed",
+    "nodesk": "https://nodesk.co/remote-jobs/engineering/index.xml"
   },
   "greatPlaces": [
     "nubank",

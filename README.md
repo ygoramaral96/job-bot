@@ -13,7 +13,7 @@ Actions, and one Cloudflare Worker on the free plan.
 
 ```
  Cloudflare Worker ──cron──▶ GitHub Actions ──▶ run.js
-                                                 │  fetch Remotive, Himalayas, WWR, Greenhouse, Lever
+                                                 │  fetch 7 job boards + Greenhouse/Lever companies
                                                  │  triage (config.json) → score + reasons
                                                  ▼
                                              Telegram card  ✅ Apply  ⏭ Skip  🚫 Company
@@ -87,7 +87,7 @@ All in [config.json](config.json); nothing is hard-coded in `src/`.
    .NET, Ruby, PHP, ...) is dropped unless it also names an on-stack one
    (`titleOnStack`). "Python Developer" goes; "Python/Node Developer" stays.
 3. **Location** is checked per source (WWR regions, Himalayas restriction
-   lists, Greenhouse/Lever free text) and then the description is searched for
+   lists, free text elsewhere) and then the description is searched for
    "US only"-style phrases (`locationBad`).
 4. **Salary** is never a filter. The highest figure found is compared with
    `salaryFloor`; a range counts as "below the floor" only when its top is.
@@ -108,10 +108,20 @@ reasons and writes nothing.
 | We Work Remotely | RSS, three categories | `<region>` / `<country>` tags |
 | Greenhouse boards | `boards-api.greenhouse.io` per company | location name, offices |
 | Lever boards | `api.lever.co` per company | `categories.location`, `workplaceType` |
+| Remote OK | JSON API | free text; a filled-in one must say open/remote |
+| Working Nomads | JSON API | free text; needs a known-good marker |
+| Jobspresso | RSS, latest 10 of all categories | after the ⚲ in `<dc:creator>` |
+| NoDesk | RSS, engineering category | none, description only |
 
 Add a company: `job-boards.greenhouse.io/<slug>` → `sources.greenhouse`;
 `jobs.lever.co/<slug>` → `sources.lever`. A failing board is logged and
-skipped; the run goes on with the others.
+skipped; the run goes on with the others. A source missing from
+`config.json` is not fetched.
+
+The same posting often sits on several boards under different URLs. Jobs
+with the same company and title are kept once, from the first source in
+`src/sources/index.js`: company boards first, since their link applies
+directly.
 
 ## Setup
 
