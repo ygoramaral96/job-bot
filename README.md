@@ -68,6 +68,10 @@ your decisions, so run the bot from a private fork.
 checkbox on each approved job and any text after its link survive, as does
 everything below a marker at the end. What you mark in the note is also
 copied back into `state/tracker.json`, so the note can be lost and rebuilt.
+To give up on a job, type `dropped` after its link: it moves to a Dropped
+section, and deleting the word brings it back. Deleting the line does
+nothing, on purpose: a missing line looks the same as a note truncated by a
+sync conflict, and that should never wipe the list.
 
 **Zero dependencies.** A tool that runs unattended should not break because a
 transitive dependency did. Fetching, HTML stripping, XML reading and the

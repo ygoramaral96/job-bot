@@ -3,14 +3,20 @@
 // the user's notes (an Obsidian vault, for instance) and is regenerated on
 // every run, except for what the user wrote in it:
 //   - the checkbox on each approved job ("- [x]" = applied) and any text typed
-//     after the job link ("interview 05/10", "rejected", ...)
+//     after the job link ("interview 05/10", "rejected", ...). Text starting
+//     with "dropped" moves the job to the Dropped section, shown as "- [-]".
 //   - everything below the manual-notes marker at the end
+// Deleting a job's line does nothing: the job comes back on the next run. A
+// missing line cannot be told apart from a note that was truncated, so only an
+// explicit "dropped" takes a job off the list. Text is the signal, not the box:
+// Obsidian's checkbox only toggles between "[ ]" and "[x]".
 
 const { timestampIso } = require('./text');
 
 const MARKER = '<!-- manual-notes: everything below this line is kept as-is by the bot -->';
 const LINK = /\[open\]\((.+?)\)/;
-const CHECKBOX_LINE = /^- \[( |x|X)\] (.*)$/;
+const CHECKBOX_LINE = /^- \[( |x|X|-)\] (.*)$/;
+const DROPPED_NOTE = /^dropped\b/i;
 const MAX_SKIPPED_SHOWN = 60;
 
 /**
@@ -30,18 +36,22 @@ function markdownTable(header, rows) {
 
 /**
  * Reads the user's edits from the previous note: checkbox state and trailing
- * text for each approved job, keyed by job URL.
+ * text for each approved or dropped job, keyed by job URL.
  */
 function readUserEdits(previousNote) {
   const edits = {};
-  const approvedSection = previousNote.split(/^## /m).find((section) => section.startsWith('✅')) || '';
-  for (const rawLine of approvedSection.split('\n')) {
+  const sections = previousNote.split(/^## /m).filter((section) => section.startsWith('✅') || section.startsWith('🗑'));
+  for (const rawLine of sections.join('\n').split('\n')) {
     const line = CHECKBOX_LINE.exec(rawLine.trim());
     if (!line) continue;
     const link = LINK.exec(line[2]);
     if (!link) continue;
     const trailing = line[2].slice(link.index + link[0].length).replace(/^\s*·\s*/, '').trim();
-    edits[link[1]] = { applied: line[1].toLowerCase() === 'x', note: trailing };
+    edits[link[1]] = {
+      applied: line[1].toLowerCase() === 'x',
+      dropped: DROPPED_NOTE.test(trailing),
+      note: trailing,
+    };
   }
   return edits;
 }
@@ -66,10 +76,16 @@ function syncStatusesFromNote(tracker, previousNote) {
 
 function renderTrackerNote(tracker, pending, previousNote = '') {
   const statuses = tracker.statuses || {};
-  const statusOf = (job) => statuses[job.id] || { applied: false, note: '' };
+  const statusOf = (job) => statuses[job.id] || { applied: false, dropped: false, note: '' };
+  const jobLine = (job, box) => {
+    const status = statusOf(job);
+    const trailing = status.note ? ` · ${status.note}` : ' · ';
+    return `- [${box}] **${job.company}** — ${job.title} · ${job.score} · ${job.date} · ${job.source} · [open](${job.url})${trailing}`;
+  };
 
-  const approved = [...tracker.approved].sort((a, b) =>
+  const approved = tracker.approved.filter((job) => !statusOf(job).dropped).sort((a, b) =>
     Number(statusOf(a).applied) - Number(statusOf(b).applied) || b.date.localeCompare(a.date));
+  const dropped = tracker.approved.filter((job) => statusOf(job).dropped).sort((a, b) => b.date.localeCompare(a.date));
   const appliedCount = approved.filter((job) => statusOf(job).applied).length;
   const skipped = [...tracker.skipped].sort((a, b) => b.date.localeCompare(a.date)).slice(0, MAX_SKIPPED_SHOWN);
   const waiting = Object.values(pending)
@@ -82,16 +98,12 @@ function renderTrackerNote(tracker, pending, previousNote = '') {
   out.push('# 📋 Job Tracker', '');
   out.push(
     '> [!info] Maintained by job-bot (GitHub Actions + Telegram)',
-    '> Approve or skip from Telegram. **Tick the box once you have applied**; anything you type after the job link (e.g. `interview 05/10`, `rejected`) is kept too. Everything else above the marker at the end is regenerated on every run.',
+    '> Approve or skip from Telegram. **Tick the box once you have applied**; anything you type after the job link (e.g. `interview 05/10`, `rejected`) is kept too. **Gave up on a job? Type `dropped` after its link** (deleting the line does nothing; it comes back). Everything else above the marker at the end is regenerated on every run.',
     '',
   );
 
   out.push(`## ✅ Approved (${approved.length}) — to apply: ${approved.length - appliedCount} · applied: ${appliedCount}`, '');
-  for (const job of approved) {
-    const status = statusOf(job);
-    const trailing = status.note ? ` · ${status.note}` : ' · ';
-    out.push(`- [${status.applied ? 'x' : ' '}] **${job.company}** — ${job.title} · ${job.score} · ${job.date} · ${job.source} · [open](${job.url})${trailing}`);
-  }
+  for (const job of approved) out.push(jobLine(job, statusOf(job).applied ? 'x' : ' '));
 
   out.push('', `## 📨 Sent to Telegram — awaiting a decision (${waiting.length})`, '');
   if (waiting.length) {
@@ -101,6 +113,13 @@ function renderTrackerNote(tracker, pending, previousNote = '') {
     ));
   } else {
     out.push('Nothing waiting.');
+  }
+
+  out.push('', `## 🗑 Dropped (${dropped.length}) — delete the word "dropped" to restore`, '');
+  if (dropped.length) {
+    for (const job of dropped) out.push(jobLine(job, '-'));
+  } else {
+    out.push('Nothing dropped.');
   }
 
   out.push('', `## ⏭ Skipped (last ${skipped.length})`, '');
